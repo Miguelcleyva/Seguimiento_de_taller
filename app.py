@@ -7,7 +7,6 @@ import datetime
 import streamlit as st
 
 st.set_page_config(page_title="Seguimiento de Taller", layout="wide")
-
 st.title("📋 Seguimiento de Vehículos en Taller")
 
 st.markdown("""
@@ -38,6 +37,7 @@ def subir_archivo_a_drive(service, archivo, nombre_archivo, id_carpeta):
         'parents': [id_carpeta]
     }
     archivo_subido = service.files().create(body=metadata, media_body=media, fields='id').execute()
+    st.write(f"✅ Archivo subido: {nombre_archivo} (ID: {archivo_subido['id']})")  # depuración
     return archivo_subido['id']
 
 # 📋 FORMULARIO PRINCIPAL
@@ -97,17 +97,26 @@ with st.form("registro_unidad"):
             carpeta_fotos_id = crear_o_obtener_carpeta(drive_service, "Fotos", carpeta_placa_id)
             carpeta_videos_id = crear_o_obtener_carpeta(drive_service, "Videos", carpeta_placa_id)
 
+            st.write("📂 Carpetas creadas o encontradas")
+            st.write("ID carpeta placa:", carpeta_placa_id)
+            st.write("ID carpeta fotos:", carpeta_fotos_id)
+            st.write("ID carpeta videos:", carpeta_videos_id)
+
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
             for foto in fotos:
-                with open(foto.name, "wb") as f:
+                nombre_temp = f"{timestamp}_{foto.name}"
+                with open(nombre_temp, "wb") as f:
                     f.write(foto.getbuffer())
-                subir_archivo_a_drive(drive_service, foto.name, foto.name, carpeta_fotos_id)
-                os.remove(foto.name)
+                subir_archivo_a_drive(drive_service, nombre_temp, nombre_temp, carpeta_fotos_id)
+                os.remove(nombre_temp)
 
             for video in videos:
-                with open(video.name, "wb") as f:
+                nombre_temp = f"{timestamp}_{video.name}"
+                with open(nombre_temp, "wb") as f:
                     f.write(video.getbuffer())
-                subir_archivo_a_drive(drive_service, video.name, video.name, carpeta_videos_id)
-                os.remove(video.name)
+                subir_archivo_a_drive(drive_service, nombre_temp, nombre_temp, carpeta_videos_id)
+                os.remove(nombre_temp)
 
             st.success(f"✅ Unidad con placa **{placa}** registrada y archivos subidos correctamente.")
 
