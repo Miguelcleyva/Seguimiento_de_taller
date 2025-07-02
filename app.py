@@ -28,7 +28,23 @@ def crear_o_obtener_carpeta(service, nombre_carpeta, id_padre):
         'parents': [id_padre]
     }
     carpeta = service.files().create(body=metadata, fields='id').execute()
+
+    # 🔒 Compartir carpeta con el usuario
+    compartir_con_usuario(service, carpeta['id'])
     return carpeta['id']
+
+def compartir_con_usuario(service, file_id):
+    user_email = "TU_CORREO@gmail.com"  # ✉️ Reemplaza con tu correo
+    permission = {
+        'type': 'user',
+        'role': 'writer',
+        'emailAddress': user_email
+    }
+    service.permissions().create(
+        fileId=file_id,
+        body=permission,
+        sendNotificationEmail=False
+    ).execute()
 
 def subir_archivo_a_drive(service, archivo_local, nombre_archivo, id_carpeta):
     media = MediaFileUpload(archivo_local, resumable=True)
@@ -37,6 +53,10 @@ def subir_archivo_a_drive(service, archivo_local, nombre_archivo, id_carpeta):
         'parents': [id_carpeta]
     }
     archivo_subido = service.files().create(body=metadata, media_body=media, fields='id').execute()
+
+    # 🔒 Compartir archivo con el usuario
+    compartir_con_usuario(service, archivo_subido['id'])
+
     st.write(f"✅ Archivo subido: {nombre_archivo} (ID: {archivo_subido['id']})")
     return archivo_subido['id']
 
