@@ -32,13 +32,12 @@ def crear_o_obtener_carpeta(service, nombre_carpeta, id_padre):
     return carpeta['id']
 
 def subir_archivo_a_drive(service, archivo, nombre_archivo, id_carpeta):
-    with open(archivo, "rb") as f:
-        media = MediaFileUpload(archivo, resumable=True)
-        metadata = {
-            'name': nombre_archivo,
-            'parents': [id_carpeta]
-        }
-        archivo_subido = service.files().create(body=metadata, media_body=media, fields='id').execute()
+    media = MediaFileUpload(archivo, resumable=True)
+    metadata = {
+        'name': nombre_archivo,
+        'parents': [id_carpeta]
+    }
+    archivo_subido = service.files().create(body=metadata, media_body=media, fields='id').execute()
     return archivo_subido['id']
 
 # 📋 FORMULARIO PRINCIPAL
@@ -70,43 +69,47 @@ with st.form("registro_unidad"):
     submitted = st.form_submit_button("Registrar unidad")
 
     if submitted:
-        # ✅ Autenticación con Google
-        SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-        creds = service_account.Credentials.from_service_account_info(
-            st.secrets["gcp_service_account"], scopes=SCOPES
-        )
+        try:
+            # ✅ Autenticación con Google
+            SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+            creds = service_account.Credentials.from_service_account_info(
+                st.secrets["gcp_service_account"], scopes=SCOPES
+            )
 
-        # ✅ Conexión con Google Sheets
-        client = gspread.authorize(creds)
-        sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1rCYR_jhWeqEQVY5N4e_Aeje-6oop310PquvqPYKB9NE")
-        worksheet = sheet.worksheet("Registro")
+            # ✅ Conexión con Google Sheets
+            client = gspread.authorize(creds)
+            sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1rCYR_jhWeqEQVY5N4e_Aeje-6oop310PquvqPYKB9NE")
+            worksheet = sheet.worksheet("Registro")
 
-        nueva_fila = [
-            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            cliente, placa, marca, modelo, compania,
-            str(fecha_ingreso), aprobado_cliente, aprobado_seguro,
-            str(fecha_aprob_cliente), str(fecha_aprob_seguro),
-            str(fecha_entrega_estimada), comentario
-        ]
-        worksheet.append_row(nueva_fila)
+            nueva_fila = [
+                datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                cliente, placa, marca, modelo, compania,
+                str(fecha_ingreso), aprobado_cliente, aprobado_seguro,
+                str(fecha_aprob_cliente), str(fecha_aprob_seguro),
+                str(fecha_entrega_estimada), comentario
+            ]
+            worksheet.append_row(nueva_fila)
 
-        # ✅ Conexión con Google Drive
-        drive_service = build('drive', 'v3', credentials=creds)
-        ID_CARPETA_TALLER = "1YhG765mZo-o0ac1EJ34XKU_Es7z1FJqC"
-        carpeta_placa_id = crear_o_obtener_carpeta(drive_service, placa, ID_CARPETA_TALLER)
-        carpeta_fotos_id = crear_o_obtener_carpeta(drive_service, "Fotos", carpeta_placa_id)
-        carpeta_videos_id = crear_o_obtener_carpeta(drive_service, "Videos", carpeta_placa_id)
+            # ✅ Conexión con Google Drive
+            drive_service = build('drive', 'v3', credentials=creds)
+            ID_CARPETA_TALLER = "1YhG765mZo-o0ac1EJ34XKU_Es7z1FJqC"
+            carpeta_placa_id = crear_o_obtener_carpeta(drive_service, placa, ID_CARPETA_TALLER)
+            carpeta_fotos_id = crear_o_obtener_carpeta(drive_service, "Fotos", carpeta_placa_id)
+            carpeta_videos_id = crear_o_obtener_carpeta(drive_service, "Videos", carpeta_placa_id)
 
-        for foto in fotos:
-            with open(foto.name, "wb") as f:
-                f.write(foto.getbuffer())
-            subir_archivo_a_drive(drive_service, foto.name, foto.name, carpeta_fotos_id)
-            os.remove(foto.name)
+            for foto in fotos:
+                with open(foto.name, "wb") as f:
+                    f.write(foto.getbuffer())
+                subir_archivo_a_drive(drive_service, foto.name, foto.name, carpeta_fotos_id)
+                os.remove(foto.name)
 
-        for video in videos:
-            with open(video.name, "wb") as f:
-                f.write(video.getbuffer())
-            subir_archivo_a_drive(drive_service, video.name, video.name, carpeta_videos_id)
-            os.remove(video.name)
+            for video in videos:
+                with open(video.name, "wb") as f:
+                    f.write(video.getbuffer())
+                subir_archivo_a_drive(drive_service, video.name, video.name, carpeta_videos_id)
+                os.remove(video.name)
 
-        st.success(f"✅ Unidad con placa **{placa}** registrada y archivos subidos correctamente.")
+            st.success(f"✅ Unidad con placa **{placa}** registrada y archivos subidos correctamente.")
+
+        except Exception as e:
+            st.error(f"❌ Error durante el registro: {e}")
