@@ -1,20 +1,43 @@
+import streamlit as st
+from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-from google.oauth2 import service_account
-import os
 import gspread
 import datetime
-import streamlit as st
+import os
 
+# Configura la página
 st.set_page_config(page_title="Seguimiento de Taller", layout="wide")
 st.title("📋 Seguimiento de Vehículos en Taller")
 
-st.markdown("""
-Esta app permite registrar, controlar y visualizar el avance de vehículos en un taller de planchado y pintura.  
-Incluye integración con Google Sheets y Drive, generación de PDF y panel de KPIs.
-""")
+# 🔐 Autenticación OAuth
+flow = Flow.from_client_config(
+    {
+        "web": {
+            "client_id": st.secrets["google_oauth"]["client_id"],
+            "client_secret": st.secrets["google_oauth"]["client_secret"],
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "redirect_uris": ["http://localhost:8501/", "https://<tu-app>.streamlit.app/"]
+        }
+    },
+    scopes=[
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/spreadsheets"
+    ],
+    redirect_uri="http://localhost:8501/"
+)
 
-# 🔧 FUNCIONES PARA GOOGLE DRIVE
+if "credentials" not in st.session_state:
+    auth_url, _ = flow.authorization_url(prompt='consent')
+    st.markdown(f"[🔐 Autoriza aquí con Google]({auth_url})")
+    st.stop()
+else:
+    from google.oauth2.credentials import Credentials
+    creds = Credentials(**st.session_state["credentials"])
+
+# 🔧 FUNCIONES
 
 def crear_o_obtener_carpeta(service, nombre_carpeta, id_padre):
     query = f"name = '{nombre_carpeta}' and mimeType = 'application/vnd.google-apps.folder' and '{id_padre}' in parents and trashed = false"
@@ -37,23 +60,10 @@ def subir_archivo_a_drive(service, archivo_local, nombre_archivo, id_carpeta):
         'parents': [id_carpeta]
     }
     archivo_subido = service.files().create(body=metadata, media_body=media, fields='id').execute()
-    st.write(f"✅ Archivo subido: {nombre_archivo} (ID: {archivo_subido['id']})")
+    st.write(f"✅ Archivo subido: {nombre_archivo}")
     return archivo_subido['id']
 
-def compartir_con_usuario(service, file_id, user_email):
-    permission = {
-        'type': 'user',
-        'role': 'writer',
-        'emailAddress': user_email
-    }
-    service.permissions().create(
-        fileId=file_id,
-        body=permission,
-        fields='id',
-        sendNotificationEmail=False
-    ).execute()
-
-# 📋 FORMULARIO PRINCIPAL
+# 📋 FORMULARIO
 
 st.subheader("📝 Registro de unidad")
 
@@ -79,20 +89,13 @@ with st.form("registro_unidad"):
     fotos = st.file_uploader("Subir fotos del daño", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
     videos = st.file_uploader("Subir videos del inventario", type=["mp4", "mov", "avi"], accept_multiple_files=True)
 
-    st.write("Fotos seleccionadas:", [f.name for f in fotos])
-    st.write("Videos seleccionados:", [v.name for v in videos])
-
     submitted = st.form_submit_button("Registrar unidad")
 
     if submitted:
         try:
-            SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-            creds = service_account.Credentials.from_service_account_info(
-                st.secrets["gcp_service_account"], scopes=SCOPES
-            )
-
-            client = gspread.authorize(creds)
-            sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1rCYR_jhWeqEQVY5N4e_Aeje-6oop310PquvqPYKB9NE")
+            # Google Sheets
+            gc = gspread.authorize(creds)
+            sheet = gc.open_by_url("https://docs.google.com/spreadsheets/d/1rCYR_jhWeqEQVY5N4e_Aeje-6oop310PquvqPYKB9NE")
             worksheet = sheet.worksheet("Registro")
 
             nueva_fila = [
@@ -104,22 +107,12 @@ with st.form("registro_unidad"):
             ]
             worksheet.append_row(nueva_fila)
 
+            # Google Drive
             drive_service = build('drive', 'v3', credentials=creds)
             ID_CARPETA_TALLER = "1YhG765mZo-o0ac1EJ34XKU_Es7z1FJqC"
             carpeta_placa_id = crear_o_obtener_carpeta(drive_service, placa, ID_CARPETA_TALLER)
             carpeta_fotos_id = crear_o_obtener_carpeta(drive_service, "Fotos", carpeta_placa_id)
             carpeta_videos_id = crear_o_obtener_carpeta(drive_service, "Videos", carpeta_placa_id)
-
-            # Compartir carpetas con tu cuenta
-            user_email = "micossioleyva@gmail.com"
-            compartir_con_usuario(drive_service, carpeta_placa_id, user_email)
-            compartir_con_usuario(drive_service, carpeta_fotos_id, user_email)
-            compartir_con_usuario(drive_service, carpeta_videos_id, user_email)
-
-            st.write("📂 Carpetas creadas o encontradas")
-            st.write("ID carpeta placa:", carpeta_placa_id)
-            st.write("ID carpeta fotos:", carpeta_fotos_id)
-            st.write("ID carpeta videos:", carpeta_videos_id)
 
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
