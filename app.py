@@ -70,7 +70,7 @@ with st.form("registro_unidad"):
     submitted = st.form_submit_button("Registrar unidad")
 
     if submitted:
-        # ✅ Autenticación con Google (usando la librería moderna)
+        # ✅ Autenticación con Google
         SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
         creds = service_account.Credentials.from_service_account_info(
             st.secrets["gcp_service_account"], scopes=SCOPES
@@ -107,10 +107,6 @@ with st.form("registro_unidad"):
             with open(video.name, "wb") as f:
                 f.write(video.getbuffer())
             subir_archivo_a_drive(drive_service, video.name, video.name, carpeta_videos_id)
-            os.remove(video.name)
-
-        st.success(f"✅ Unidad con placa **{placa}** registrada y archivos subidos correctamente.")
-
             os.remove(video.name)
 
         st.success(f"✅ Unidad con placa **{placa}** registrada y archivos subidos correctamente.")
