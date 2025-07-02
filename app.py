@@ -1,3 +1,7 @@
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import datetime
+import json
 import streamlit as st
 
 st.set_page_config(page_title="Seguimiento de Taller", layout="wide")
@@ -33,4 +37,26 @@ with st.form("registro_unidad"):
     submitted = st.form_submit_button("Registrar unidad")
 
     if submitted:
-        st.success(f"✅ Unidad con placa **{placa}** registrada correctamente.")
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds_dict = st.secrets["gcp_service_account"]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+
+        # Abre tu hoja de cálculo
+        sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1rCYR_jhWeqEQVY5N4e_Aeje-6oop310PquvqPYKB9NE")
+        worksheet = sheet.worksheet("Registro")  # Asegúrate que esta hoja exista
+
+        # Prepara los datos
+        nueva_fila = [
+            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            cliente, placa, marca, modelo, compania,
+            str(fecha_ingreso), aprobado_cliente, aprobado_seguro,
+            str(fecha_aprob_cliente), str(fecha_aprob_seguro),
+            str(fecha_entrega_estimada), comentario
+        ]
+
+        # Agrega la fila
+        worksheet.append_row(nueva_fila)
+
+        st.success(f"✅ Unidad con placa **{placa}** registrada y guardada en Google Sheets.")
+
