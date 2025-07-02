@@ -3,7 +3,6 @@ from googleapiclient.http import MediaFileUpload
 from google.oauth2 import service_account
 import os
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 import datetime
 import streamlit as st
 
@@ -71,12 +70,14 @@ with st.form("registro_unidad"):
     submitted = st.form_submit_button("Registrar unidad")
 
     if submitted:
-        # ✅ GUARDAR EN GOOGLE SHEETS
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds_dict = st.secrets["gcp_service_account"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        client = gspread.authorize(creds)
+        # ✅ Autenticación con Google (usando la librería moderna)
+        SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+        creds = service_account.Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"], scopes=SCOPES
+        )
 
+        # ✅ Conexión con Google Sheets
+        client = gspread.authorize(creds)
         sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1rCYR_jhWeqEQVY5N4e_Aeje-6oop310PquvqPYKB9NE")
         worksheet = sheet.worksheet("Registro")
 
@@ -89,11 +90,8 @@ with st.form("registro_unidad"):
         ]
         worksheet.append_row(nueva_fila)
 
-        # ✅ SUBIR ARCHIVOS A GOOGLE DRIVE
-        SCOPES = ['https://www.googleapis.com/auth/drive']
-        creds_drive = service_account.Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=SCOPES)
-        drive_service = build('drive', 'v3', credentials=creds_drive)
-
+        # ✅ Conexión con Google Drive
+        drive_service = build('drive', 'v3', credentials=creds)
         ID_CARPETA_TALLER = "1YhG765mZo-o0ac1EJ34XKU_Es7z1FJqC"
         carpeta_placa_id = crear_o_obtener_carpeta(drive_service, placa, ID_CARPETA_TALLER)
         carpeta_fotos_id = crear_o_obtener_carpeta(drive_service, "Fotos", carpeta_placa_id)
@@ -109,6 +107,10 @@ with st.form("registro_unidad"):
             with open(video.name, "wb") as f:
                 f.write(video.getbuffer())
             subir_archivo_a_drive(drive_service, video.name, video.name, carpeta_videos_id)
+            os.remove(video.name)
+
+        st.success(f"✅ Unidad con placa **{placa}** registrada y archivos subidos correctamente.")
+
             os.remove(video.name)
 
         st.success(f"✅ Unidad con placa **{placa}** registrada y archivos subidos correctamente.")
