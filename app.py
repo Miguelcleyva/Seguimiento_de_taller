@@ -30,14 +30,14 @@ def crear_o_obtener_carpeta(service, nombre_carpeta, id_padre):
     carpeta = service.files().create(body=metadata, fields='id').execute()
     return carpeta['id']
 
-def subir_archivo_a_drive(service, archivo, nombre_archivo, id_carpeta):
-    media = MediaFileUpload(archivo, resumable=True)
+def subir_archivo_a_drive(service, archivo_local, nombre_archivo, id_carpeta):
+    media = MediaFileUpload(archivo_local, resumable=True)
     metadata = {
         'name': nombre_archivo,
         'parents': [id_carpeta]
     }
     archivo_subido = service.files().create(body=metadata, media_body=media, fields='id').execute()
-    st.write(f"✅ Archivo subido: {nombre_archivo} (ID: {archivo_subido['id']})")  # depuración
+    st.write(f"✅ Archivo subido: {nombre_archivo} (ID: {archivo_subido['id']})")
     return archivo_subido['id']
 
 # 📋 FORMULARIO PRINCIPAL
@@ -66,17 +66,18 @@ with st.form("registro_unidad"):
     fotos = st.file_uploader("Subir fotos del daño", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
     videos = st.file_uploader("Subir videos del inventario", type=["mp4", "mov", "avi"], accept_multiple_files=True)
 
+    st.write("Fotos seleccionadas:", [f.name for f in fotos])
+    st.write("Videos seleccionados:", [v.name for v in videos])
+
     submitted = st.form_submit_button("Registrar unidad")
 
     if submitted:
         try:
-            # ✅ Autenticación con Google
             SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
             creds = service_account.Credentials.from_service_account_info(
                 st.secrets["gcp_service_account"], scopes=SCOPES
             )
 
-            # ✅ Conexión con Google Sheets
             client = gspread.authorize(creds)
             sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1rCYR_jhWeqEQVY5N4e_Aeje-6oop310PquvqPYKB9NE")
             worksheet = sheet.worksheet("Registro")
@@ -90,7 +91,6 @@ with st.form("registro_unidad"):
             ]
             worksheet.append_row(nueva_fila)
 
-            # ✅ Conexión con Google Drive
             drive_service = build('drive', 'v3', credentials=creds)
             ID_CARPETA_TALLER = "1YhG765mZo-o0ac1EJ34XKU_Es7z1FJqC"
             carpeta_placa_id = crear_o_obtener_carpeta(drive_service, placa, ID_CARPETA_TALLER)
